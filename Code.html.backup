@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lesson Plan Creator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Custom styles for range input thumb for better cross-browser consistency */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #2563EB; /* blue-600 */
+            border: 2px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+            margin-top: -8px; /* Vertically center the thumb */
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #2563EB;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        /* Helper class for small descriptive text */
+        .small-print {
+            font-size: 0.75rem; /* text-xs */
+            color: #6b7280; /* text-gray-500 */
+            margin-bottom: 0.25rem;
+            line-height: 1.25;
+        }
+        /* Styles for the modal overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        /* Styles for the modal content */
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+        /* Style for highlighting validation errors */
+        .validation-error {
+            border-color: #EF4444 !important; /* red-500 */
+            box-shadow: 0 0 0 2px #F87171; /* red-400 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-2 sm:p-4">
+
+    <!-- Message Box for non-blocking notifications -->
+    <div id="message-box" class="fixed top-4 right-4 z-50 transition-transform transform translate-x-full">
+        <div class="text-white font-semibold py-3 px-6 rounded-lg shadow-lg">
+            <!-- Message content will be set by JS -->
+        </div>
+    </div>
+    
+    <!-- Export Confirmation Modal -->
+    <div id="export-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modal-title" class="text-xl font-bold mb-4" data-i18n="select-periods-export">Select Periods for Export</h2>
+            <p id="modal-description" class="text-gray-600 mb-4" data-i18n="modal-description">Choose which periods to include in the CSV file. 'Complete' periods have all required fields filled.</p>
+            <div id="period-checkboxes-container" class="space-y-2 max-h-80 overflow-y-auto mb-4">
+                <!-- Dynamic checkboxes for each period -->
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button id="cancel-export-btn" class="py-2 px-4 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors" data-i18n="cancel-export">Cancel</button>
+                <button id="confirm-export-btn" class="py-2 px-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors" data-i18n="generate-csv">Generate CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto bg-white p-4 sm:p-8 rounded-2xl shadow-xl">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-center text-gray-800" data-i18n="lesson-plan-creator">Lesson Plan Creator</h1>
+            <select id="language-selector" class="rounded-lg border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="en" selected>English</option>
+                <option value="am">አማርኛ</option>
+                <option value="or">Afaan Oromoo</option>
+            </select>
+        </header>
+
+        <!-- Mode Selection Buttons -->
+        <nav class="flex flex-col sm:flex-row gap-2 mb-6">
+            <button id="annual-plan-btn" class="flex-1 py-3 px-6 bg-blue-600 text-white font-semibold rounded-xl shadow-md hover:bg-blue-700 transition-colors" data-i18n="annual-plan">Annual Plan</button>
+            <button id="daily-plan-btn" class="flex-1 py-3 px-6 bg-gray-200 text-gray-700 font-semibold rounded-xl shadow-md hover:bg-gray-300 transition-colors" data-i18n="daily-lesson-plan">Daily Lesson Plan</button>
+        </nav>
+
+        <!-- Annual Plan Form -->
+        <section id="annual-plan-form" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Teacher Name -->
+                <div>
+                    <label for="teacher-name" class="block text-sm font-medium text-gray-700" data-i18n="teacher-name">Teacher Name</label>
+                    <input type="text" id="teacher-name" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <!-- Subject -->
+                <div>
+                    <label for="subject" class="block text-sm font-medium text-gray-700" data-i18n="subject">Subject</label>
+                    <select id="subject" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"></select>
+                </div>
+                <!-- Grade -->
+                <div>
+                    <label for="grade" class="block text-sm font-medium text-gray-700" data-i18n="grade">Grade</label>
+                    <select id="grade" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"></select>
+                </div>
+                 <!-- Sections Checkboxes -->
+                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="sections">Sections (select all that apply)</label>
+                    <div id="sections-container" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2"></div>
+                </div>
+                <!-- Semester -->
+                <div>
+                    <label for="semester" class="block text-sm font-medium text-gray-700" data-i18n="semester">Semester</label>
+                    <select id="semester" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="First Semester" data-i18n="first-semester">First Semester</option>
+                        <option value="Second Semester" data-i18n="second-semester">Second Semester</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="my-4">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 text-center" data-i18n="plan-periods">Plan Periods</h2>
+            
+            <!-- Dynamic Period Entry Fields -->
+            <div id="annual-period-entries" class="space-y-4 mb-4"></div>
+
+            <div class="flex flex-col sm:flex-row justify-center gap-2 mt-2">
+                <button id="add-period-btn" class="py-2 px-6 bg-gray-200 text-gray-700 font-semibold rounded-xl shadow-md hover:bg-gray-300 transition-colors" data-i18n="add-another-period">Add another Period</button>
+                <button id="add-catchup-btn" class="py-2 px-6 bg-yellow-400 text-yellow-900 font-semibold rounded-xl shadow-md hover:bg-yellow-500 transition-colors" data-i18n="add-catchup-period">Add Catchup Period</button>
+            </div>
+            
+            <div class="flex justify-center mt-4">
+                <button id="generate-annual-csv" class="py-3 px-8 bg-green-600 text-white font-semibold rounded-xl shadow-md hover:bg-green-700 transition-colors" data-i18n="generate-annual-csv">Generate Annual Plan CSV</button>
+            </div>
+        </section>
+
+        <!-- Daily Lesson Plan Form -->
+        <section id="daily-plan-form" class="hidden space-y-4">
+            <!-- Annual Plan CSV Upload -->
+            <div>
+                <label for="annual-plan-upload" class="block text-sm font-medium text-gray-700" data-i18n="upload-annual-plan-csv">Upload Annual Plan CSV</label>
+                <input type="file" id="annual-plan-upload" accept=".csv" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <p id="upload-status" class="mt-2 text-sm text-gray-600"></p>
+            </div>
+            
+            <div id="daily-plan-forms-container" class="space-y-4 hidden"></div>
+            
+            <div class="flex justify-center mt-4">
+                <button id="generate-daily-csv" class="py-3 px-8 bg-green-600 text-white font-semibold rounded-xl shadow-md hover:bg-green-700 transition-colors" data-i18n="generate-daily-csv">Generate Daily Lesson Plan CSV</button>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Main script for the Lesson Plan Creator application.
+        // This script handles UI logic, event listeners, data management, and CSV generation.
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- UI Element References ---
+            const annualPlanBtn = document.getElementById('annual-plan-btn');
+            const dailyPlanBtn = document.getElementById('daily-plan-btn');
+            const annualPlanForm = document.getElementById('annual-plan-form');
+            const dailyPlanForm = document.getElementById('daily-plan-form');
+            const generateAnnualCsvBtn = document.getElementById('generate-annual-csv');
+            const generateDailyCsvBtn = document.getElementById('generate-daily-csv');
+            const annualPlanUpload = document.getElementById('annual-plan-upload');
+            const dailyPlanFormsContainer = document.getElementById('daily-plan-forms-container');
+            const uploadStatus = document.getElementById('upload-status');
+            const messageBox = document.getElementById('message-box');
+            const annualPeriodEntries = document.getElementById('annual-period-entries');
+            const addPeriodBtn = document.getElementById('add-period-btn');
+            const addCatchupBtn = document.getElementById('add-catchup-btn');
+            const exportModal = document.getElementById('export-modal');
+            const periodCheckboxesContainer = document.getElementById('period-checkboxes-container');
+            const cancelExportBtn = document.getElementById('cancel-export-btn');
+            const confirmExportBtn = document.getElementById('confirm-export-btn');
+            const languageSelector = document.getElementById('language-selector');
+
+            // --- State Variables ---
+            let periodCounter = 0;
+            let parsedAnnualPlanData = [];
+            let currentLang = 'en';
+
+            // --- Translation Data ---
+            const translations = {
+                'lesson-plan-creator': { am: 'የትምህርት እቅድ ማዘጋጃ', or: 'Ummama Karoora Barnootaa' },
+                'annual-plan': { am: 'ዓመታዊ እቅድ', or: 'Karoora Waggaa' },
+                'daily-lesson-plan': { am: 'ዕለታዊ የትምህርት እቅድ', or: 'Karoora Barnootaa Guyyaa' },
+                'teacher-name': { am: 'የመምህሩ ስም', or: 'Maqaa Barsiisaa' },
+                'subject': { am: 'የትምህርት አይነት', or: 'Gosa Barnootaa' },
+                'grade': { am: 'ክፍል', or: 'Kutaa' },
+                'semester': { am: 'ሴሚስቴር', or: 'Semesterii' },
+                'first-semester': { am: 'የመጀመሪያ ሴሚስተር', or: 'Semesterii Duraa' },
+                'second-semester': { am: 'ሁለተኛ ሴሚስተር', or: 'Semesterii Lammataa' },
+                'sections': { am: 'ሴክሽን (የሚመለከተውን ሁሉ ይምረጡ)', or: 'Section (hundumaa fili)' },
+                'plan-periods': { am: 'የክፍለ ጊዜ እቅዶች', or: 'Karoora Waytii' },
+                'period': { am: 'ክፍለ ጊዜ', or: 'Waytii' },
+                'week': { am: 'ሣምንት', or: 'Torbee' },
+                'date': { am: 'ቀን', or: 'Guyyaa' },
+                'gregorian-calendar': { am: 'የጎርጎርያን', or: 'Gregorian' },
+                'amharic-calendar': { am: 'የአማርኛ', or: 'Amharic' },
+                'oromo-calendar': { am: 'የአፋን ኦሮሞ', or: 'Afaan Oromoo' },
+                'page': { am: 'ገጽ', or: 'Fuula' },
+                'unit': { am: 'ምዕራፍ', or: 'Boqonnaa' },
+                'unit-number': { am: 'የምዕራፍ ቁጥር', or: 'Lakkoofsa Boqonnaa' },
+                'major-topic': { am: 'አብይ ርዕሶች', or: 'Mata duree ijoo' },
+                'content': { am: 'ይዘት', or: 'Qabiyyee' },
+                'expected-competency': { am: 'የሚጠበቅባቸው ብቃት', or: 'Gahumsa eegamuu' },
+                'competencies-at-end': { am: 'በዚህ ርዕስ መጨረሻ ላይ ተማሪዎቹ የሚከተሉትን ማድረግ ይችላሉ።', or: 'Dhuma mata duree kanaa irratti barattoonni kana hojjechuu dandaʼu:' },
+                'remove': { am: 'አስወግድ', or: 'Haquuf' },
+                'add-another-period': { am: 'ሌላ ክፍለ ጊዜ ጨምር', or: 'Waytii biraa itti dabali' },
+                'add-catchup-period': { am: 'የማካካሻ ክፍለ ጊዜ ጨምር', or: 'Waytii guduunfaa itti dabali' },
+                'generate-annual-csv': { am: 'ዓመታዊ እቅድ CSV ፍጠር', or: 'Karoora waggaa CSV uumi' },
+                'upload-annual-plan-csv': { am: 'ዓመታዊ እቅድ CSV ስቀል', or: 'Karoora waggaa CSV ol kaa\'i' },
+                'generate-daily-csv': { am: 'ዕለታዊ እቅድ CSV ፍጠር', or: 'Karoora guyyaa CSV uumi' },
+                'duration': { am: 'የተሠጠው ጊዜ', or: 'Yeroo Kenname' },
+                'stages': { am: 'ደረጃዎች', or: 'Sadarkaalee' },
+                'introduction': { am: 'መግቢያ', or: 'Gochaalee jalqabaa' },
+                'presentation': { am: 'ገለፃ', or: 'Gochaalee ijoo' },
+                'summarization': { am: 'ማጠቃለያ (ክለሳ)', or: 'Gochaalee xumuraa/guduunfaa' },
+                'task': { am: 'ተግባር', or: 'Hojii' },
+                'description': { am: 'ገለጻ', or: 'Ibsa' },
+                'teaching-methodologies': { am: 'የማስተማሪያ ዘዴዎች', or: 'Mala barsisuu' },
+                'teaching-aids-references': { am: 'የት/ት መርጃ እና መሳሪያ', or: 'MDB' },
+                'assessment': { am: 'ግምገማ', or: 'Iyyaafanno' },
+                'remark': { am: 'ምርመራ', or: 'Yaada' },
+                'select-a-task': { am: 'ተግባር ይምረጡ', or: 'Hojii filadhu' },
+                'select-periods-export': { am: 'ለመላክ ክፍለ ጊዜዎችን ይምረጡ', or: 'Waytii erguuf filadhu' },
+                'modal-description': { am: 'ወደተፈጠረው የCSV ፋይል ውስጥ ማካተት የሚፈልጉትን ክፍለ ጊዜ ይምረጡ። "የተጠናቀቀ" ተብለው ምልክት የተደረገባቸው ክፍለ ጊዜዎች ሁሉም አስፈላጊ መስኮች ተሞልተዋል።', or: 'Waytii CSV keessatti argamuu qaban filadhu. Waytii "Guutuu" jedhamee mallatteeffamee fi teessoon isaa guutameera.' },
+                'cancel-export': { am: 'ሰርዝ', or: 'Haquuf' },
+                'generate-csv': { am: 'CSV ፍጠር', or: 'CSV uumi' },
+                'fill-all-fields': { am: 'እባክዎ ሁሉንም አጠቃላይ መስኮች ይሙሉ.', or: 'Moo ta\'ee, teessoo waliigalaa hunda guuti.' },
+                'annual-csv-generated': { am: 'ዓመታዊ እቅድ CSV ተፈጥሯል!', or: 'Karoora waggaa CSV uumameera!' },
+                'daily-csv-generated': { am: 'ዕለታዊ እቅድ CSV ተፈጥሯል!', or: 'Karoora guyyaa CSV uumameera!' },
+                'min': { am: 'ደቂቃ', or: 'daqiiqaa' },
+                'error-reading-file': { am: 'ፋይሉን በማንበብ ላይ ስህተት ተፈጥሯል። እባክዎን የፋይል ቅርጸቱን ያረጋግጡ እና እንደገና ይሞክሩ።', or: 'Yeroo faayilii dubbisuu dogoggorri uumame. Faayiliin yookaan sirrii miti yookaan odeeffannoo hin qabu.' },
+                'upload-annual-plan-first': { am: 'ዕለታዊውን ዕቅድ ለመፍጠር እባክዎን በመጀመሪያ ትክክለኛውን ዓመታዊ ዕቅድ ይስቀሉ.', or: 'Karoora guyyaa uumuuf duraan dursee karoora waggaa sirrii ol kaayi.' },
+                'catchup-topic': { am: 'የማካካሻ ክፍለ ጊዜ', or: 'Waytii Guduunfaa' },
+                'select-at-least-one-period': { am: "እባክዎን ለማውጣት ቢያንስ አንድ ክፍለ ጊዜ ይምረጡ.", or: "Waytii CSV keessatti argamuu qaban filadhu." },
+                'add-daily-overrides': { am: 'ተጨማሪ ዕለታዊ መረጃ ያክሉ', or: 'Odeeffannoo Dabalataa guyyaa guyyaa' },
+                'daily-override-details': { am: 'ለዚህ ቀን ብቻ ተጨማሪ መረጃ ይሙሉ.', or: 'Odeeffannoo dabalataa kana guyyaa qofaaf guuti.' },
+                'additional-teaching-methodologies': { am: 'ተጨማሪ የማስተማሪያ ዘዴዎች', or: 'Mala barsiisuu dabalataa' },
+                'additional-teaching-aids-references': { am: 'ተጨማሪ የት/ት መርጃ እና መሳሪያ', or: 'MDB Dabalataa' },
+                'additional-assessment': { am: 'ተጨማሪ ግምገማ', or: 'Iyyaafannoo Dabalataa' },
+                'additional-remark': { am: 'ተጨማሪ ምርመራ', or: 'Yaada Dabalataa' },
+                'catchup-note': { am: 'ይህ የማካካሻ ክፍለ ጊዜ ስለሆነ እነዚህ መስኮች ተዘግተዋል።', or: 'Kun waytii guduunfaa waan ta’eef, teessoon kun hin hojjetu.' },
+                'incomplete-fields-error': { am: 'እባክዎ ከመቀጠልዎ በፊት በደመቁት ክፍለ ጊዜዎች ውስጥ ያሉትን ሁሉንም የቀሩ መስኮች ይሙሉ.', or: 'Moo ta\'ee, duraan dursee teessoo diimaa\'e hunda guuti.' }
+            };
+
+            // Task descriptions for each stage, used for daily plan dropdowns.
+            const stageTasks = {
+                'Introduction': [
+                    "Review the previous lesson to refresh students' memory and reinforce learning.",
+                    "Give students a chance to revise the key points from the last topic.",
+                    "Ask questions related to the previous lesson to check understanding and encourage participation.",
+                    "Begin by clearly stating the objective of the lesson."
+                ],
+                'Presentation': [
+                    "Organize students into groups to discuss key points and present their findings.",
+                    "Provide a short summary note to highlight the main ideas.",
+                    "Offer a clear explanation of the topic to deepen understanding.",
+                    "Ask questions related to the lesson and listen to students’ responses.",
+                    "Give constructive feedback based on their answers to reinforce learning.",
+                    "Ask questions to check students’ understanding of the content."
+                ],
+                'Summarization': [
+                    "Provide a key summary to conclude the day’s lesson.",
+                    "Allow students to give their own summary based on the guiding questions."
+                ]
+            };
+
+            // Translations for the stage task descriptions.
+            const stageTaskTranslations = {
+                'Review the previous lesson to refresh students\' memory and reinforce learning.': {
+                    am: 'የተማሪዎችን ትውስታ ለማደስ እና ትምህርቱን ለማጠናከር ያለፈውን ትምህርት ይገምግሙ።',
+                    or: 'Barnoota kaleessaa barattoota yaadachiisuufi cimsuuf irra deebi’ii ilaali.'
+                },
+                'Give students a chance to revise the key points from the last topic.': {
+                    am: 'ተማሪዎች ከመጨረሻው ርዕስ ዋና ዋና ነጥቦችን እንዲከልሱ እድል ይስጡ።',
+                    or: 'Barattootaaf mata duree xumuraa irraa xiyyeeffannoo jajjaboo akka ilaalan carraa kenni.'
+                },
+                'Ask questions related to the previous lesson to check understanding and encourage participation.': {
+                    am: 'ተማሪዎች ምን ያህል እንደተረዱ ለማወቅ እና እንዲሳተፉ ለማበረታታት ከቀድሞው ትምህርት ጋር የተያያዙ ጥያቄዎችን ይጠይቁ።',
+                    or: 'Hubannoo fi hirmaannaa barattootaa mirkaneessuuf gaaffiiwwan barannoo darbee irratti gaafadhu.'
+                },
+                'Begin by c
